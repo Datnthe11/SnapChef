@@ -124,7 +124,7 @@ class MultiheadAttention(nn.Module):
             # don't attend to padding symbols
             attn_weights = attn_weights.view(bsz, self.num_heads, tgt_len, src_len)
             attn_weights = attn_weights.float().masked_fill(
-                key_padding_mask.unsqueeze(1).unsqueeze(2),
+                key_padding_mask.unsqueeze(1).unsqueeze(2).bool(),
                 float('-inf'),
             ).type_as(attn_weights)  # FP16 support: cast to float and back
             attn_weights = attn_weights.view(bsz * self.num_heads, tgt_len, src_len)

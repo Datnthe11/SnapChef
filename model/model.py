@@ -83,11 +83,11 @@ def get_model(args, ingr_vocab_size, instrs_vocab_size):
                                       last_ln=True,
                                       scale_embed_grad=False)
     # recipe loss
-    criterion = MaskedCrossEntropyCriterion(ignore_index=[instrs_vocab_size-1], reduce=False)
+    criterion = MaskedCrossEntropyCriterion(ignore_index=[instrs_vocab_size-1], reduction='none')
 
     # ingredients loss
-    label_loss = nn.BCELoss(reduce=False)
-    eos_loss = nn.BCELoss(reduce=False)
+    label_loss = nn.BCELoss(reduction='none')
+    eos_loss = nn.BCELoss(reduction='none')
 
     model = InverseCookingModel(encoder_ingrs, decoder, ingr_decoder, encoder_image,
                                 crit=criterion, crit_ingr=label_loss, crit_eos=eos_loss,

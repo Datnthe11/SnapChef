@@ -11,20 +11,20 @@ from model.args import get_parser
 from model.model import get_model
 from model.output_utils import prepare_output
 
-# Xác định thiết bị (CPU/GPU)
+# Determine device (CPU/GPU)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Hàm tải file từ URL
+# Function to download file from URL
 def download_file(url, save_path):
-    st.info(f"⏳ Đang tải file từ {url}...")
+    st.info(f"⏳ Downloading file from {url}...")
     try:
         urllib.request.urlretrieve(url, save_path)
-        st.success(f"✅ Đã tải xong: {os.path.basename(save_path)}")
+        st.success(f"✅ Download complete: {os.path.basename(save_path)}")
     except Exception as e:
-        st.error(f"❌ Lỗi khi tải file: {e}")
+        st.error(f"❌ Download error: {e}")
         raise e
 
-# Định nghĩa hàm load mô hình
+# Function to load model
 def load_model(model_path, args, ingr_vocab_size, instr_vocab_size, device):
     model = get_model(args, ingr_vocab_size, instr_vocab_size)
     model.load_state_dict(torch.load(model_path, map_location=device))
@@ -32,7 +32,7 @@ def load_model(model_path, args, ingr_vocab_size, instr_vocab_size, device):
     model.eval()
     return model
 
-# Hàm tiền xử lý ảnh
+# Function for image preprocessing
 def preprocess_image(image, model_name="resnet101"):
     image_size = 299 if "inception" in model_name else 224
     transform = transforms.Compose([
@@ -42,14 +42,13 @@ def preprocess_image(image, model_name="resnet101"):
     ])
     return transform(image).unsqueeze(0).to(device)
 
-# Hàm dự đoán công thức
+# Function to predict recipe
 def predict_recipe(image, model, ingr_vocab, instr_vocab):
     input_tensor = preprocess_image(image)
     with torch.no_grad():
         output = model.sample(input_tensor)
-        print(output)
         if not output or "recipe_ids" not in output or len(output["recipe_ids"]) == 0:
-            raise ValueError("Mô hình không sinh ra bất kỳ công thức nào. Kiểm tra lại input và model.")
+            raise ValueError("Model failed to generate a recipe. Please check input and model.")
         
         ingr_ids = output['ingr_ids'].cpu().numpy()
         recipe_ids = output['recipe_ids'].cpu().numpy()
@@ -57,17 +56,17 @@ def predict_recipe(image, model, ingr_vocab, instr_vocab):
         outs, valid = prepare_output(recipe_ids[0], ingr_ids[0], ingr_vocab, instr_vocab)
         
         if not valid['is_valid']:
-            raise ValueError(f"Công thức không hợp lệ. Lý do: {valid['reason']}")
+            raise ValueError(f"Invalid recipe generated. Reason: {valid['reason']}")
         
         return outs
 
-# Load mô hình và từ điển
+# Load model and vocabularies
 @st.cache_resource()
 def load_resources():
     parser = get_parser()
-    args = parser.parse_args([])  # Tránh lỗi khi chạy trên Streamlit
+    args = parser.parse_args([])  # Avoid errors when running on Streamlit
     
-    # Đường dẫn file (sử dụng đường dẫn tương đối)
+    # File paths (using relative paths)
     data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
@@ -76,17 +75,17 @@ def load_resources():
     ingr_vocab_path = os.path.join(data_dir, "ingr_vocab.pkl")
     instr_vocab_path = os.path.join(data_dir, "instr_vocab.pkl")
     
-    # URL tải file weight
+    # Weight file download URLs
     urls = {
         model_path: "https://dl.fbaipublicfiles.com/inversecooking/modelbest.ckpt",
         ingr_vocab_path: "https://dl.fbaipublicfiles.com/inversecooking/ingr_vocab.pkl",
         instr_vocab_path: "https://dl.fbaipublicfiles.com/inversecooking/instr_vocab.pkl"
     }
 
-    # Kiểm tra và tải file nếu thiếu
+    # Check and download missing files
     for path, url in urls.items():
         if not os.path.exists(path):
-            st.warning(f"File {os.path.basename(path)} không tìm thấy. Bắt đầu tải...")
+            st.warning(f"File {os.path.basename(path)} not found. Starting download...")
             download_file(url, path)
     
     # Load vocabs
@@ -100,40 +99,40 @@ def load_resources():
         ingr_vocab_list = ingr_vocab
         ingr_vocab = {i: word for i, word in enumerate(ingr_vocab_list)}
     else:
-      ingr_vocab_list = list(ingr_vocab.values())
+        ingr_vocab_list = list(ingr_vocab.values())
 
     model = load_model(model_path, args, len(ingr_vocab), len(instr_vocab), device)
     
     return model, ingr_vocab_list, instr_vocab
 
-# Tải tài nguyên
+# Load resources
 model, ingr_vocab, instr_vocab = load_resources()
 
-# Giao diện Streamlit
-st.title("🍽️ Inverse Cooking - Dự đoán công thức món ăn từ ảnh")
-st.write("Tải ảnh món ăn của bạn lên để nhận công thức gợi ý!")
+# Streamlit UI
+st.title("🍽️ Inverse Cooking - Recipe Prediction from Images")
+st.write("Upload a dish photo to get a suggested recipe!")
 
-# Tải ảnh lên
-uploaded_file = st.file_uploader("📸 Chọn ảnh món ăn", type=["jpg", "png", "jpeg"])
+# Upload image
+uploaded_file = st.file_uploader("📸 Choose a food image", type=["jpg", "png", "jpeg"])
 
 if uploaded_file is not None:
     image = Image.open(uploaded_file).convert("RGB")
-    st.image(image, caption="Ảnh món ăn", use_column_width=True)
+    st.image(image, caption="Uploaded Dish", width='stretch')
     
-    if st.button("🎯 Dự đoán công thức"):
-        st.write("⏳ Đang chạy mô hình...")
+    if st.button("🎯 Predict Recipe"):
+        st.write("⏳ Running model analysis...")
         
         try:
             recipe = predict_recipe(image, model, ingr_vocab, instr_vocab)
-            st.write("✅ **Mô hình đã hoàn thành!**")
+            st.write("✅ **Analysis Complete!**")
 
-            st.subheader("🥕 Nguyên liệu:")
+            st.subheader("🥕 Ingredients:")
             for ingredient in recipe["ingrs"]:
                 st.write(f"- {ingredient}")
 
-            st.subheader("📜 Công thức:")
+            st.subheader("📜 Cooking Instructions:")
             for step in recipe["recipe"]:
-              st.write(f"- {step}")
+                st.write(f"- {step}")
 
         except Exception as e:
-            st.error(f"Lỗi: {e}")
+            st.error(f"Error: {e}")

@@ -11,7 +11,11 @@ class EncoderCNN(nn.Module):
     def __init__(self, embed_size, dropout=0.5, image_model='resnet101', pretrained=True):
         """Load the pretrained ResNet-152 and replace top fc layer."""
         super(EncoderCNN, self).__init__()
-        resnet = globals()[image_model](pretrained=pretrained)
+        # Modern torchvision uses 'weights', older versions use 'pretrained'
+        try:
+            resnet = globals()[image_model](weights='DEFAULT' if pretrained else None)
+        except TypeError:
+            resnet = globals()[image_model](pretrained=pretrained)
         modules = list(resnet.children())[:-2]  # delete the last fc layer.
         self.resnet = nn.Sequential(*modules)
 

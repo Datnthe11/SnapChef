@@ -40,7 +40,7 @@ def make_positions(tensor, padding_idx, left_pad):
         positions = positions - mask.size(1) + mask.long().sum(dim=1).unsqueeze(1)
 
     out = tensor.clone()
-    out = out.masked_scatter_(mask,positions[mask])
+    out = out.masked_scatter_(mask.bool(),positions[mask])
     return out
 
 
@@ -282,7 +282,7 @@ class DecoderTransformer(nn.Module):
                 self.layer_norms_in[1](img_features)
 
         if ingr_mask is not None:
-            ingr_mask = (1-ingr_mask.squeeze(1)).byte()
+            ingr_mask = (1-ingr_mask.squeeze(1)).bool()
 
         # embed positions
         if self.embed_positions is not None:

@@ -14,10 +14,10 @@ map_loc = None if torch.cuda.is_available() else 'cpu'
 
 class MaskedCrossEntropyCriterion(_WeightedLoss):
 
-    def __init__(self, ignore_index=[-100], reduce=None):
-        super(MaskedCrossEntropyCriterion, self).__init__()
+    def __init__(self, ignore_index=[-100], reduction='none'):
+        super(MaskedCrossEntropyCriterion, self).__init__(reduction=reduction)
         self.padding_idx = ignore_index
-        self.reduce = reduce
+        self.reduction = reduction
 
     def forward(self, outputs, targets):
         lprobs = nn.functional.log_softmax(outputs, dim=-1)
@@ -28,8 +28,10 @@ class MaskedCrossEntropyCriterion(_WeightedLoss):
             targets[targets == idx] = 0
 
         nll_loss = -lprobs.gather(dim=-1, index=targets.unsqueeze(1))
-        if self.reduce:
+        if self.reduction == 'sum':
             nll_loss = nll_loss.sum()
+        elif self.reduction == 'mean':
+            nll_loss = nll_loss.mean()
 
         return nll_loss.squeeze()
 
